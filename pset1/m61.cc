@@ -7,55 +7,56 @@
 #include <cassert>
 #include <iostream>
 
-// struct meta {
-//     meta* next;
-//     meta* prev;
-//     size_t block_sz; 
-//     int allocated; 
-//     bool active; 
-//     char* file;
-//     long line; 
-// };
+struct meta {
+    meta* next;
+    meta* prev;
+    size_t block_sz; 
+    int allocated; 
+    bool active; 
+    const char* file;
+    long line; 
+};
 
-// struct list {
-//     meta* head = nullptr; 
-//     meta* tail = nullptr; 
-// };
+struct list {
+    meta* head = nullptr; 
+    meta* tail = nullptr; 
+};
 
-// void list_push_front(list* l, meta* n) {
-//     n->next = l->head;
-//     n->prev = nullptr;
-//     if (l->head) {
-//         l->head->prev = n;
-//     } else {
-//         l->tail = n;
-//     }
-//     l->head = n;
-// }
+void list_push_front(list& l, meta* n) {
+    n->next = l.head; 
+    n->prev = nullptr;
+    if (l.head) {
+        l.head->prev = n;
+    } else {
+        l.tail = n;
+    }
+    l.head = n;
 
-// void list_push_back(list* l, meta* n) {
-//     n->next = nullptr;
-//     n->prev = l->tail;
-//     if (l->tail) {
-//         l->tail->next = n;
-//     } else {
-//         l->head = n;
-//     }
-//     l->tail = n;
-// }
+}
 
-// void list_erase(list* l, meta* n) {
-//     if (n->next) {
-//         n->next->prev = n->prev;
-//     } else {
-//         l->tail = n->prev;
-//     }
-//     if (n->prev) {
-//         n->prev->next = n->next;
-//     } else {
-//         l->head = n->next;
-//     }
-// }
+void list_push_back(list* l, meta* n) {
+    n->next = nullptr;
+    n->prev = l->tail;
+    if (l->tail) {
+        l->tail->next = n;
+    } else {
+        l->head = n;
+    }
+    l->tail = n;
+}
+
+void list_erase(list& l, meta* n) {
+    if (n->next) {
+        n->next->prev = n->prev;
+    } else {
+        l.tail = n->prev;
+    }
+    if (n->prev) {
+        n->prev->next = n->next;
+    } else {
+        l.head = n->next;
+    }
+}
 
 // Initialize global struct to track allocation statistics
 // Use static keyword, as this struct will only be used in this file
@@ -63,16 +64,16 @@ static m61_statistics gstats = {0, 0, 0, 0, 0, 0, std::numeric_limits<uintptr_t>
 const static int ALLOCATED = 0x0D6B8D6E;
 const static int FOOT_KEY = 0xCF7ABCA2;
 
-// list* activesites; 
+list activesites = {};
 
 
-struct meta {
-    size_t block_sz; 
-    int allocated; 
-    bool active; 
-    char* file;
-    long line; 
-};
+// struct meta {
+//     size_t block_sz; 
+//     int allocated; 
+//     bool active; 
+//     char* file;
+//     long line; 
+// };
 
 
 
@@ -122,13 +123,17 @@ void* m61_malloc(size_t sz, const char* file, long line) {
     data->block_sz = sz;
     data->active = true; 
     data->allocated = ALLOCATED;
+    data->file = file; 
+    data->line = line; 
 
     // Set the next several bytes of memory past the end of the allocated block, so we can later detect wild writes
     int* footer = (int*) (payload_address + sz);
     *footer = FOOT_KEY; 
 
     // Add the meta data to our activesites linked list
-    // list_push_front(activesites, data);
+    
+    
+    list_push_front(activesites, data);
 
     // Return pointer to the payload
     return (void*) ((uintptr_t) ptr + sizeof(meta)); 
@@ -174,7 +179,7 @@ void m61_free(void* ptr, const char* file, long line) {
         data->active = false;
         // Free the memory
 
-        // list_erase(activesites, data); 
+        list_erase(activesites, data); 
 
         base_free(data);
     }
@@ -237,10 +242,12 @@ void m61_print_statistics() {
 
 void m61_print_leak_report() {
     // Your code here.
-    // meta* head = activesites->head; 
-    // if (!head) {
-    //     std::cout << "OK" << std::endl;
-    // }
+    meta* data = activesites.head; 
+    
+    while (data) {
+        std::cout << "LEAK CHECK: "<< data->file << ":" << data->line << ": allocated object " << (void*) ((uintptr_t) data + sizeof(meta)) << " with size " << data->block_sz << std::endl;
+        data = data->next;
+    }
 }
 
 

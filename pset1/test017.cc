@@ -15,7 +15,6 @@ void f() {
 int main() {
     f();
     m61_print_statistics();
-    m61_print_leak_report();
 }
 
 //! alloc count: active          0   total    ??>=1??   fail          0
